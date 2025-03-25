@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from tkinter import Tk, Button, Label, filedialog, messagebox, StringVar, OptionMenu, PhotoImage
 from openpyxl import load_workbook
-from openpyxl.styles import Font, Border, Side, NamedStyle, PatternFill
+from openpyxl.styles import Font, Border, Side, NamedStyle, PatternFill, Alignment
 from openpyxl.utils.dataframe import dataframe_to_rows
 import os
 from PIL import Image, ImageTk
@@ -132,6 +132,44 @@ def process_data(csv_file_path, excel_path, date_option):
     wb = load_workbook(excel_path)
     ws = wb['Summary']
 
+    # Move data up by 2 columns and down by 2 rows
+    max_row = ws.max_row
+    max_col = ws.max_column
+    for row in range(max_row, 0, -1):
+        for col in range(max_col, 0, -1):
+            new_row = row + 2
+            new_col = col + 2
+            ws.cell(row=new_row, column=new_col, value=ws.cell(row=row, column=col).value)
+            ws.cell(row=row, column=col).value = None
+
+    # Add a blank row at row 4 and set its height to 7.5
+    ws.insert_rows(4)
+    ws.row_dimensions[4].height = 7.5
+
+    # Ensure the first two columns are blank, have no filling, and no borders
+    for row in range(1, max_row + 4):
+        for col in range(1, 3):
+            cell = ws.cell(row=row, column=col)
+            cell.value = None
+            cell.fill = PatternFill(fill_type=None)
+            cell.border = Border()
+
+    # Ensure row 1 has no borders
+    for col in range(1, max_col + 3):
+        cell = ws.cell(row=1, column=col)
+        cell.border = Border()
+
+    # Add title row
+    title = "SECU 6 month Active billing"
+    ws.merge_cells('D1:H1')
+    title_cell = ws['D1']
+    title_cell.value = title
+    title_cell.font = Font(bold=True, underline='single', size=14)
+
+    # Ensure cells A3 and B3 have no fill
+    ws['A3'].fill = PatternFill(fill_type=None)
+    ws['B3'].fill = PatternFill(fill_type=None)
+
     # Define styles
     currency_format = NamedStyle(name='currency', number_format='R #,##0.00')
     number_format = NamedStyle(name='number', number_format='0')
@@ -162,50 +200,59 @@ def process_data(csv_file_path, excel_path, date_option):
     currency_cols = ['17300', '15300', 'Total_ex_VAT', 'Amount', 'Price Per Unit']
     for col in currency_cols:
         if col in summary_df.columns:
-            col_letter = chr(ord('A') + summary_df.columns.get_loc(col))
-            for cell in ws[col_letter][1:]:  # Skip header row
+            col_letter = chr(ord('A') + summary_df.columns.get_loc(col) + 2)  # Adjust for new column position
+            for cell in ws[col_letter][4:]:  # Skip title, blank rows, and header row
                 cell.style = currency_format
 
     # Apply numeric formatting to 'DaysActive' and 'MonthsActive'
     numeric_cols = ['DaysActive', 'MonthsActive']
     for col in numeric_cols:
         if col in summary_df.columns:
-            col_letter = chr(ord('A') + summary_df.columns.get_loc(col))
-            for cell in ws[col_letter][1:]:  # Skip header row
+            col_letter = chr(ord('A') + summary_df.columns.get_loc(col) + 2)  # Adjust for new column position
+            for cell in ws[col_letter][4:]:  # Skip title, blank rows, and header row
                 cell.style = number_format
 
     # Apply fill color and font color for headings on 'Summary' sheet
-    for cell in ws[1]:  # Apply styles to the first row (headers)
+    for cell in ws[3][2:]:  # Apply styles to the new header row (row 3), starting from column 3
         cell.fill = header_fill
         cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')  # Center align the headings
 
     # Apply red font formatting to rows where 'Total_ex_VAT' = 0
-    total_ex_vat_col_index = summary_df.columns.get_loc('Total_ex_VAT') + 1  # +1 for 1-based index
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-        total_ex_vat_cell = row[total_ex_vat_col_index - 1]  # Indexing correction for 0-based indexing
-        if total_ex_vat_cell.value is not None and total_ex_vat_cell.value == 0:
-            for cell in row:
-                cell.font = red_font
+    total_ex_vat_col_index = summary_df.columns.get_loc('Total_ex_VAT') + 3  # Adjust for new column position
+    if total_ex_vat_col_index <= ws.max_column:
+        for row in ws.iter_rows(min_row=5, max_row=ws.max_row, min_col=3, max_col=ws.max_column):
+            total_ex_vat_cell = row[total_ex_vat_col_index - 3]  # Indexing correction for 0-based indexing
+            if total_ex_vat_cell.value is not None and total_ex_vat_cell.value == 0:
+                for cell in row:
+                    cell.font = red_font
 
-    # Apply borders to the headings (first row)
-    for cell in ws[1]:  # First row
+    # Apply borders to the headings (row 3)
+    for cell in ws[3][2:]:  # Row 3
         cell.border = border_style
 
     # Apply bold font to 'Total_ex_VAT' values greater than 0
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=total_ex_vat_col_index, max_col=total_ex_vat_col_index):
-        total_ex_vat_cell = row[0]
-        if total_ex_vat_cell.value is not None and total_ex_vat_cell.value > 0:
-            total_ex_vat_cell.font = bold_font
+    if total_ex_vat_col_index <= ws.max_column:
+        for row in ws.iter_rows(min_row=5, max_row=ws.max_row, min_col=total_ex_vat_col_index, max_col=total_ex_vat_col_index):
+            total_ex_vat_cell = row[0]
+            if total_ex_vat_cell.value is not None and total_ex_vat_cell.value > 0:
+                total_ex_vat_cell.font = bold_font
+
+    # Apply bold font to 'Total' row
+    total_row_index = ws.max_row
+    for cell in ws[total_row_index]:
+        cell.font = Font(bold=True)
 
     # Apply 'Top and Thick Bottom' border style with black color to the 'Total_ex_VAT' cell in the 'Total' row
-    total_ex_vat_total_cell = ws.cell(row=ws.max_row, column=total_ex_vat_col_index)
-    total_ex_vat_total_cell.border = total_ex_vat_border
+    if total_ex_vat_col_index <= ws.max_column:
+        total_ex_vat_total_cell = ws.cell(row=ws.max_row, column=total_ex_vat_col_index)
+        total_ex_vat_total_cell.border = total_ex_vat_border
 
     # Uncheck gridlines
     ws.sheet_view.showGridLines = False
 
     # Apply left and bottom borders to all rows except 'Total' and blank row
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row - 2, min_col=1, max_col=ws.max_column):
+    for row in ws.iter_rows(min_row=5, max_row=ws.max_row - 2, min_col=3, max_col=ws.max_column):
         for cell in row:
             if cell.row != ws.max_row:  # Skip the 'Total' row
                 cell.border = border_style
@@ -213,6 +260,25 @@ def process_data(csv_file_path, excel_path, date_option):
     # Adjust the row height of the blank row above 'Total'
     blank_row_index = ws.max_row - 1
     ws.row_dimensions[blank_row_index].height = 7.5
+
+    # Add a thick border to the outside of the data starting from row 5, column 3
+    thick_border_style = Border(
+        left=Side(border_style='thick', color="000000"),
+        right=Side(border_style='thick', color="000000"),
+        top=Side(border_style='thick', color="000000"),
+        bottom=Side(border_style='thick', color="000000")
+    )
+
+    for row in ws.iter_rows(min_row=5, max_row=ws.max_row - 2, min_col=3, max_col=ws.max_column):
+        for cell in row:
+            if cell.row == 5:  # Top border
+                cell.border = Border(top=thick_border_style.top, left=cell.border.left, right=cell.border.right, bottom=cell.border.bottom)
+            if cell.row == ws.max_row - 2:  # Bottom border
+                cell.border = Border(bottom=thick_border_style.bottom, left=cell.border.left, right=cell.border.right, top=cell.border.top)
+            if cell.column == 3:  # Left border
+                cell.border = Border(left=thick_border_style.left, top=cell.border.top, right=cell.border.right, bottom=cell.border.bottom)
+            if cell.column == ws.max_column:  # Right border
+                cell.border = Border(right=thick_border_style.right, top=cell.border.top, left=cell.border.left, bottom=cell.border.bottom)
 
     # Add the 'Updated Data' sheet
     ws_new = wb.create_sheet(title='Updated Data')
