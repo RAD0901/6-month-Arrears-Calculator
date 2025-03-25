@@ -96,6 +96,13 @@ def process_data(csv_file_path, excel_path, date_option):
         'ItemCode_15300': '15300'
     }, inplace=True)
 
+    # Add new columns to summary_df
+    summary_df['% Split'] = summary_df.apply(
+        lambda row: row['15300'] / row['17300'] if row['17300'] != 0 else 0, axis=1
+    )
+    summary_df['% 15300'] = round(summary_df['TotalActive'] * summary_df['% Split'])
+    summary_df['% 17300'] = summary_df['TotalActive'] - summary_df['% 15300']
+
     # Calculate the total sum for 'Total_ex_VAT'
     total_ex_vat = summary_df['Total_ex_VAT'].sum()
 
@@ -198,11 +205,20 @@ def process_data(csv_file_path, excel_path, date_option):
 
     # Apply formatting to specific columns
     currency_cols = ['17300', '15300', 'Total_ex_VAT', 'Amount', 'Price Per Unit']
+    # Add '% Split' to the list of percentage columns
+    percentage_cols = ['% Split']
+
     for col in currency_cols:
         if col in summary_df.columns:
             col_letter = chr(ord('A') + summary_df.columns.get_loc(col) + 2)  # Adjust for new column position
             for cell in ws[col_letter][4:]:  # Skip title, blank rows, and header row
                 cell.style = currency_format
+
+    for col in percentage_cols:
+        if col in summary_df.columns:
+            col_letter = chr(ord('A') + summary_df.columns.get_loc(col) + 2)  # Adjust for new column position
+            for cell in ws[col_letter][4:]:  # Skip title, blank rows, and header row
+                cell.number_format = '0.00%'
 
     # Apply numeric formatting to 'DaysActive' and 'MonthsActive'
     numeric_cols = ['DaysActive', 'MonthsActive']
