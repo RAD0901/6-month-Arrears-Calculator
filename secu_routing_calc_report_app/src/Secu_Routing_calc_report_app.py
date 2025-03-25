@@ -103,6 +103,15 @@ def process_data(csv_file_path, excel_path, date_option):
     summary_df['% 15300'] = round(summary_df['TotalActive'] * summary_df['% Split'])
     summary_df['% 17300'] = summary_df['TotalActive'] - summary_df['% 15300']
 
+    # Format % Split cells that equal 0 to "-"
+    summary_df['% Split'] = summary_df['% Split'].apply(lambda x: '-' if x == 0 else x)
+
+    # Format % 17300 cells where % Split is "-"
+    summary_df['% 17300'] = summary_df.apply(lambda row: '-' if row['% Split'] == '-' else row['% 17300'], axis=1)
+
+    # Format % 15300 cells that equal 0 to "-"
+    summary_df['% 15300'] = summary_df['% 15300'].apply(lambda x: '-' if x == 0 else x)
+
     # Calculate the total sum for 'Total_ex_VAT'
     total_ex_vat = summary_df['Total_ex_VAT'].sum()
 
@@ -218,7 +227,10 @@ def process_data(csv_file_path, excel_path, date_option):
         if col in summary_df.columns:
             col_letter = chr(ord('A') + summary_df.columns.get_loc(col) + 2)  # Adjust for new column position
             for cell in ws[col_letter][4:]:  # Skip title, blank rows, and header row
-                cell.number_format = '0.00%'
+                if cell.value == 0:
+                    cell.value = '-'
+                else:
+                    cell.number_format = '0%'
 
     # Apply numeric formatting to 'DaysActive' and 'MonthsActive'
     numeric_cols = ['DaysActive', 'MonthsActive']
@@ -227,6 +239,24 @@ def process_data(csv_file_path, excel_path, date_option):
             col_letter = chr(ord('A') + summary_df.columns.get_loc(col) + 2)  # Adjust for new column position
             for cell in ws[col_letter][4:]:  # Skip title, blank rows, and header row
                 cell.style = number_format
+
+    # Format % 17300 cells where % Split is "-"
+    percent_17300_col_index = summary_df.columns.get_loc('% 17300') + 3  # Adjust for new column position
+    percent_split_col_index = summary_df.columns.get_loc('% Split') + 3  # Adjust for new column position
+    if percent_17300_col_index <= ws.max_column and percent_split_col_index <= ws.max_column:
+        for row in ws.iter_rows(min_row=5, max_row=ws.max_row, min_col=3, max_col=ws.max_column):
+            percent_split_cell = row[percent_split_col_index - 3]  # Indexing correction for 0-based indexing
+            percent_17300_cell = row[percent_17300_col_index - 3]  # Indexing correction for 0-based indexing
+            if percent_split_cell.value == '-':
+                percent_17300_cell.value = '-'
+
+    # Format % 15300 cells that equal 0 to "-"
+    percent_15300_col_index = summary_df.columns.get_loc('% 15300') + 3  # Adjust for new column position
+    if percent_15300_col_index <= ws.max_column:
+        for row in ws.iter_rows(min_row=5, max_row=ws.max_row, min_col=3, max_col=ws.max_column):
+            percent_15300_cell = row[percent_15300_col_index - 3]  # Indexing correction for 0-based indexing
+            if percent_15300_cell.value == 0:
+                percent_15300_cell.value = '-'
 
     # Apply fill color and font color for headings on 'Summary' sheet
     for cell in ws[3][2:]:  # Apply styles to the new header row (row 3), starting from column 3
