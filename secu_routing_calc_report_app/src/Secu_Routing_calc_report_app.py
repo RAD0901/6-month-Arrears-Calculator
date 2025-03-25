@@ -274,7 +274,7 @@ def main():
     # Create the GUI window
     root = Tk()
     root.title("SECU 6 month arrears bill Generator")
-    root.geometry("500x250")  # Set window size
+    root.geometry("450x300")  # Set window size
     root.configure(bg="#FFFFFF")  # Set background color
 
     # Set application icon
@@ -298,7 +298,7 @@ def main():
     date_option_menu.config(font=("Helvetica", 12))
     date_option_menu.pack(pady=10)
 
-    button = Button(root, text="Generate Report", command=on_generate_report, font=("Helvetica", 12), fg="#FFFFFF", bg="#33CC33")
+    button = Button(root, text="Generate Report", command=on_generate_report, font=("Helvetica", 12), fg="#FFFFFF", bg="#2457FC")
     button.pack(pady=10)
 
     # Run the GUI event loop
